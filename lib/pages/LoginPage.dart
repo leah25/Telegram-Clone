@@ -152,12 +152,13 @@ class LoginScreenState extends State<LoginScreen> {
       } else {
         currentUser = firebaseUser;
 
-        await preferences.setString('id', documentSnapshots[0]['id']);
+        await preferences.setString('id', documentSnapshots[0].data()['id']);
         await preferences.setString(
-            'nickname', documentSnapshots[0]['nickname']);
+            'nickname', documentSnapshots[0].data()['nickname']);
         await preferences.setString(
-            'photoURL', documentSnapshots[0]['photoURL']);
-        await preferences.setString('aboutMe', documentSnapshots[0]['aboutMe']);
+            'photoURL', documentSnapshots[0].data()['photoURL']);
+        await preferences.setString(
+            'aboutMe', documentSnapshots[0].data()['aboutMe']);
       }
       Fluttertoast.showToast(msg: 'Congratulations, Sign in Success');
       this.setState(() {
