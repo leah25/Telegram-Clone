@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "24051546567",
+    "firebase_url": "https://telegramclone-9ee9d.firebaseio.com",
+    "project_id": "telegramclone-9ee9d",
+    "storage_bucket": "telegramclone-9ee9d.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:24051546567:android:c2e76d68113da00ddc01e2",
+        "android_client_info": {
+          "package_name": "com.leahsharon.sms_chat_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "24051546567-s5n1hqjjumlsgmk4ju491vr0m3rao8j4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.leahsharon.sms_chat_app",
+            "certificate_hash": "7f70cfa1e600b0ecea7d12e420bae99f72f11d8d"
+          }
+        },
+        {
+          "client_id": "24051546567-dmhe658ktc2hn49a0c8mb7rgdf23cd84.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCH4hWqEOLw3h0DTJ-iCBpuef4ZsyiwW5w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "24051546567-dmhe658ktc2hn49a0c8mb7rgdf23cd84.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
