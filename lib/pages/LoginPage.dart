@@ -40,7 +40,7 @@ class LoginScreenState extends State<LoginScreen> {
 
     isLoggedIn = await googleSignIn.isSignedIn();
     if (isLoggedIn) {
-      Navigator.push(
+      Navigator.pushReplacement(
           context,
           MaterialPageRoute(
               builder: (context) =>
@@ -55,22 +55,25 @@ class LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [Colors.lightBlueAccent, Colors.purpleAccent]),
-        ),
+        color: Colors.blue,
+        // decoration: BoxDecoration(
+        //   gradient: LinearGradient(
+        //       begin: Alignment.topRight,
+        //       end: Alignment.bottomLeft,
+        //
+        //       colors: [Colors.lightBlueAccent, Colors.purpleAccent]),
+        // ),
         alignment: Alignment.center,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             Text(
-              'Angler',
+              'Sms_Chat',
               style: TextStyle(
                   fontSize: 64, color: Colors.white, fontFamily: 'Signatra'),
             ),
+            SizedBox(height: 20),
             GestureDetector(
               onTap: controlSignIn,
               child: Center(
@@ -78,13 +81,14 @@ class LoginScreenState extends State<LoginScreen> {
                   children: <Widget>[
                     Container(
                       width: 270,
-                      height: 65,
+                      height: 45,
                       decoration: BoxDecoration(
                           image: DecorationImage(
                         image: AssetImage('images/google_signin_button.png'),
                         fit: BoxFit.cover,
                       )),
                     ),
+                    SizedBox(height: 20),
                     Padding(
                       padding: EdgeInsets.all(1.0),
                       child: isLoading ? circularProgress() : Container(),
@@ -137,9 +141,9 @@ class LoginScreenState extends State<LoginScreen> {
             .doc(firebaseUser.uid)
             .set({
           "nickname": firebaseUser.displayName,
-          "photoUrl": firebaseUser.photoURL,
+          "photoURL": firebaseUser.photoURL,
           "id": firebaseUser.uid,
-          "aboutMe": "i am a developer",
+          "aboutMe": " ",
           "createdAt": DateTime.now().millisecondsSinceEpoch.toString(),
           "chattingWith": null
         });
@@ -164,7 +168,8 @@ class LoginScreenState extends State<LoginScreen> {
       this.setState(() {
         isLoading = false;
       });
-      Navigator.push(
+
+      Navigator.pushReplacement(
           context,
           MaterialPageRoute(
               builder: (context) =>

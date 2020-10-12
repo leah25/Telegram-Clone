@@ -1,10 +1,12 @@
-import 'dart:async';
-
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sms_chat_app/main.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
+import 'package:sms_chat_app/models/user.dart';
 import 'package:sms_chat_app/pages/AccountSettingsPage.dart';
+import 'package:sms_chat_app/pages/ChattingPage.dart';
+import 'package:sms_chat_app/widgets/ProgressWidget.dart';
 
 class HomeScreen extends StatefulWidget {
   final String currentUserId;
@@ -17,9 +19,10 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   TextEditingController searchController = TextEditingController();
+  Future<QuerySnapshot> searchedSnapshot;
 
   clearText() {
-   searchController.clear();
+    searchController.clear();
   }
 
   homePageHeader() {
@@ -56,36 +59,144 @@ class HomeScreenState extends State<HomeScreen> {
               ),
               onPressed: clearText),
         ),
+        onFieldSubmitted: searchInputText,
       ),
     );
+  }
+
+  searchInputText(String searchName) {
+    Future<QuerySnapshot> allUsers = FirebaseFirestore.instance
+        .collection("users")
+        .where("nickname", isGreaterThanOrEqualTo: searchName)
+        .get();
+
+    setState(() {
+      searchedSnapshot = allUsers;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: homePageHeader(),
-      body: Center(
-        child: RaisedButton.icon(
-            onPressed: signingOut,
-            icon: Icon(Icons.exit_to_app),
-            label: Text('Logout')),
-      ),
+      body: (searchedSnapshot == null) ? HasNoDataScreen() : HasDataScreen(),
     );
   }
 
-  GoogleSignIn googleSignIn = GoogleSignIn();
-  FirebaseAuth auth = FirebaseAuth.instance;
-  Future<void> signingOut() async {
-    auth.signOut();
-    await googleSignIn.disconnect();
-    await googleSignIn.signOut();
+  HasDataScreen() {
+    return FutureBuilder(
+      future: searchedSnapshot,
+      builder: (context, dataSnapshot) {
+        if (!dataSnapshot.hasData) {
+          return circularProgress();
+        }
+        List<UserResult> searchUserResult = [];
+        dataSnapshot.data.documents.forEach((document) {
+          if (document != null) {
+            User eachUser = User.fromDocument(document);
+            UserResult userResult = UserResult(eachUser: eachUser);
+            if (widget.currentUserId != document.data()['id']) {
+              searchUserResult.add(userResult);
+            }
+          } else {
+            return Fluttertoast.showToast(msg: 'User not Found!');
+          }
+        });
+        return ListView(
+          children: searchUserResult,
+        );
+      },
+    );
+  }
 
-    Navigator.pushAndRemoveUntil(context,
-        MaterialPageRoute(builder: (context) => MyApp()), (route) => false);
+  HasNoDataScreen() {
+    return Container(
+      child: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            children: [
+              SizedBox(
+                height: 30.0,
+              ),
+              Icon(
+                Icons.group,
+                size: 200,
+                color: Colors.blue,
+              ),
+              SizedBox(
+                height: 20.0,
+              ),
+              Text(
+                'Search Users',
+                style: TextStyle(
+                    color: Colors.blue,
+                    fontSize: 40.0,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class UserResult extends StatelessWidget {
+  final User eachUser;
+  UserResult({this.eachUser});
+
   @override
-  Widget build(BuildContext context) {}
+  Widget build(BuildContext context) {
+    navigateToChat() {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                  receiverPhoto: eachUser.photoURL,
+                  receiverName: eachUser.nickname,
+                  receiverId: eachUser.id)));
+    }
+
+    return Padding(
+      padding: EdgeInsets.all(4.0),
+      child: GestureDetector(
+        onTap: () {
+          return navigateToChat();
+        },
+        child: Container(
+          child: Column(
+            children: [
+              GestureDetector(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.black,
+                    backgroundImage:
+                        CachedNetworkImageProvider(eachUser.photoURL),
+                  ),
+                  title: Text(
+                    eachUser.nickname,
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Joined:' +
+                        DateFormat('dd MMMM yyyy - hh:mm:aa').format(
+                            DateTime.fromMillisecondsSinceEpoch(
+                                int.parse(eachUser.createdAt))),
+                    style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic),
+                  ),
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -1,9 +1,27 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sms_chat_app/widgets/ProgressWidget.dart';
+
+import '../main.dart';
+
+class Settings extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SettingsScreen(),
+    );
+  }
+}
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -11,123 +29,326 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class SettingsScreenState extends State<SettingsScreen> {
-  String id = '';
-  String nickname = '';
-  String photoURL = '';
-  String aboutMe = '';
-  File imageCircleAvatar;
+  TextEditingController nicknameTextEditingController;
+  TextEditingController aboutMeTextEditingController;
 
   SharedPreferences preferences;
+  String id = '';
+  String nickname = '';
+  String aboutMe = '';
+  String photoURL = '';
 
-  bool isLoading;
+  File imageFileAvatar;
+  bool isLoading = false;
+
+  final FocusNode nickNameFocusNode = FocusNode();
+  final FocusNode aboutMeFocusNode = FocusNode();
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    updateProfileSettings();
+
+    readDataFromLocal();
   }
 
-  void getImage() async {
-    PickedFile selectedImage =
-        await ImagePicker().getImage(source: ImageSource.gallery);
-
-    if (selectedImage != null) {
-      setState(() {
-        imageCircleAvatar = File(selectedImage.path);
-      });
-    }
-  }
-
-  void updateProfileSettings() async {
-    // getStored data from local
+  void readDataFromLocal() async {
     preferences = await SharedPreferences.getInstance();
-
     id = preferences.getString('id');
     nickname = preferences.getString('nickname');
-    photoURL = preferences.getString('photoURL');
     aboutMe = preferences.getString('aboutMe');
+    photoURL = preferences.getString('photoURL');
+
+    nicknameTextEditingController = TextEditingController(text: nickname);
+    aboutMeTextEditingController = TextEditingController(text: aboutMe);
+
+    setState(() {});
+  }
+
+  Future getImage() async {
+    File newImageFile =
+        await ImagePicker.pickImage(source: ImageSource.gallery);
+    if (newImageFile != null) {
+      setState(() {
+        imageFileAvatar = newImageFile;
+        isLoading = true;
+      });
+    }
+
+    uploadImageToFireStoreAndStorage();
+  }
+
+  Future uploadImageToFireStoreAndStorage() async {
+    String mFileName = id;
+    StorageReference storageReference =
+        FirebaseStorage.instance.ref().child(mFileName);
+    StorageUploadTask storageUploadTask =
+        storageReference.putFile(imageFileAvatar);
+    StorageTaskSnapshot storageTaskSnapshot;
+    storageUploadTask.onComplete.then((value) {
+      if (value.error == null) {
+        storageTaskSnapshot = value;
+
+        storageTaskSnapshot.ref.getDownloadURL().then((newImageLoadUrl) {
+          photoURL = newImageLoadUrl;
+
+          FirebaseFirestore.instance.collection('users').doc(id).update({
+            'photoURL': photoURL,
+            'aboutMe': aboutMe,
+            'nickname': nickname,
+          }).then((data) async {
+            await preferences.setString('photoURL', photoURL);
+
+            setState(() {
+              isLoading = false;
+            });
+
+            Fluttertoast.showToast(msg: 'Updated Successfully');
+          });
+        }, onError: (errorMsg) {
+          setState(() {
+            isLoading = false;
+          });
+          Fluttertoast.showToast(msg: 'Error occurred in getting Download Url');
+        });
+      }
+    }, onError: (errorMgs) {
+      setState(() {
+        isLoading = false;
+      });
+      Fluttertoast.showToast(msg: errorMgs.toString());
+    });
+  }
+
+  void updateData() {
+    nickNameFocusNode.unfocus();
+    aboutMeFocusNode.unfocus();
+    setState(() {
+      isLoading = false;
+    });
+    FirebaseFirestore.instance.collection('users').doc(id).update({
+      'photoURL': photoURL,
+      'aboutMe': aboutMe,
+      'nickname': nickname,
+    }).then((data) async {
+      await preferences.setString('photoURL', photoURL);
+      await preferences.setString('aboutMe', aboutMe);
+      await preferences.setString('nickname', nickname);
+
+      setState(() {
+        isLoading = false;
+      });
+
+      Fluttertoast.showToast(msg: 'Updated Successfully');
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blue,
+        iconTheme: IconThemeData(color: Colors.white),
+        backgroundColor: Colors.lightBlue,
         title: Text(
           'Account Settings',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+        centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          Center(
-            child: Column(
-              children: [
-                Container(
-                  height: 200,
-                  width: 200,
-                  child: Stack(
-                    children: [
-                      (imageCircleAvatar == null)
-                          ? (photoURL != "")
-                              ? Material(
-                                  // will contain the image from the photoURL
-                                  child: CachedNetworkImage(
-                                    imageUrl: photoURL,
-                                    placeholder: (context, url) {
-                                      return Container(
-                                        height: 200,
-                                        width: 200,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.0,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  Colors.lightBlue),
-                                        ),
-                                      );
-                                    },
-                                    width: 200,
-                                    height: 200,
-                                    fit: BoxFit.cover,
+      body: SingleChildScrollView(
+        child: Column(
+          children: <Widget>[
+            //profile image - avatar
+            SizedBox(height: 20.0),
+            Container(
+              child: Stack(
+                children: <Widget>[
+                  (imageFileAvatar == null)
+                      ? (photoURL != '')
+                          ? Material(
+                              // display already existing - old image file
+                              child: CachedNetworkImage(
+                                placeholder: (context, url) => Container(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.0,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.lightBlueAccent),
                                   ),
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(120.0)),
-                                  clipBehavior: Clip.hardEdge,
-                                )
-                              : Icon(
-                                  Icons.account_circle,
-                                  size: 200,
-                                  color: Colors.grey,
-                                )
-                          : Material(
-                              // display selected image
-                              child: Image.file(
-                                imageCircleAvatar,
-                                height: 200,
+                                  width: 200,
+                                  height: 200,
+                                  padding: EdgeInsets.all(20),
+                                ),
+                                imageUrl: photoURL,
                                 width: 200,
+                                height: 200,
+                                fit: BoxFit.cover,
                               ),
                               borderRadius:
-                                  BorderRadius.all(Radius.circular(150.0)),
+                                  BorderRadius.all(Radius.circular(125)),
                               clipBehavior: Clip.hardEdge,
-                            ),
-                      Center(
-                        child: IconButton(
-                            icon: Icon(
-                              Icons.camera_alt,
-                              color: Colors.transparent,
-                              size: 50.0,
-                            ),
-                            onPressed: getImage),
-                      )
-                    ],
+                            )
+                          : Icon(
+                              Icons.account_circle,
+                              size: 90,
+                              color: Colors.grey,
+                            )
+                      : Material(
+                          // display the new updated image here
+                          child: Image.file(
+                            imageFileAvatar,
+                            width: 200,
+                            height: 200,
+                            fit: BoxFit.cover,
+                          ),
+                          borderRadius: BorderRadius.all(Radius.circular(125)),
+                          clipBehavior: Clip.hardEdge,
+                        ),
+                  Positioned(
+                    top: 150,
+                    left: 150,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      radius: 25.0,
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.camera_alt,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                        onPressed: getImage,
+                        iconSize: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            //Input Fields
+            Column(
+              children: <Widget>[
+                Padding(
+                  padding: EdgeInsets.all(1.0),
+                  child: isLoading ? circularProgress() : Container(),
+                ),
+                //username
+                Container(
+                  child: Text(
+                    'Profile Name : ',
+                    style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.lightBlueAccent),
+                  ),
+                  margin: EdgeInsets.only(left: 10, bottom: 5, top: 10),
+                ),
+                Container(
+                  child: Theme(
+                    data: Theme.of(context)
+                        .copyWith(primaryColor: Colors.lightBlueAccent),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'e.g John Doe',
+                        contentPadding: EdgeInsets.all(5.0),
+                        hintStyle: TextStyle(color: Colors.grey),
+                      ),
+                      controller: nicknameTextEditingController,
+                      onChanged: (value) {
+                        nickname = value;
+                      },
+                      focusNode: nickNameFocusNode,
+                    ),
+                  ),
+                  margin: EdgeInsets.symmetric(horizontal: 30),
+                ),
+
+                //aboutMe
+                Container(
+                  child: Text(
+                    'About Me : ',
+                    style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.lightBlueAccent),
+                  ),
+                  margin: EdgeInsets.only(left: 10, bottom: 5, top: 30),
+                ),
+                Container(
+                  child: Theme(
+                    data: Theme.of(context)
+                        .copyWith(primaryColor: Colors.lightBlueAccent),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Bio...',
+                        contentPadding: EdgeInsets.all(5.0),
+                        hintStyle: TextStyle(color: Colors.grey),
+                      ),
+                      controller: aboutMeTextEditingController,
+                      onChanged: (value) {
+                        aboutMe = value;
+                      },
+                      focusNode: aboutMeFocusNode,
+                    ),
+                  ),
+                  margin: EdgeInsets.symmetric(horizontal: 30),
+                )
+              ],
+              crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                  child: FlatButton(
+                    onPressed: updateData,
+                    child: Text(
+                      'Update',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    color: Colors.lightBlueAccent,
+                    highlightColor: Colors.grey,
+                    splashColor: Colors.transparent,
+                    textColor: Colors.white,
+                  ),
+                ),
+
+                //logout Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 15.0),
+                  child: RaisedButton(
+                    color: Colors.red,
+                    onPressed: logoutUser,
+                    child: Text(
+                      'Logout',
+                      style: TextStyle(color: Colors.white, fontSize: 14),
+                    ),
                   ),
                 )
               ],
             ),
-          ),
-        ],
+            //Button
+          ],
+        ),
+        padding: EdgeInsets.only(left: 15, right: 15),
       ),
     );
+  }
+
+  final GoogleSignIn googleSignIn = GoogleSignIn();
+
+  Future<Null> logoutUser() async {
+    await FirebaseAuth.instance.signOut();
+    await googleSignIn.disconnect();
+    await googleSignIn.signOut();
+
+    this.setState(() {
+      isLoading = false;
+    });
+
+    Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => MyApp()),
+        (Route<dynamic> route) => false);
   }
 }
