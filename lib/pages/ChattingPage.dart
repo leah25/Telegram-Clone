@@ -1,10 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -89,6 +94,8 @@ class ChatScreenState extends State<ChatScreen> {
     chatId = '';
 
     readLocal();
+    registerNotification();
+    configLocalNotification();
   }
 
   readLocal() async {
@@ -423,7 +430,7 @@ class ChatScreenState extends State<ChatScreen> {
                           Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>FullPhotoScreen (
+                                  builder: (context) => FullPhotoScreen(
                                       url: document.data()['content'])));
                         },
                       ),
@@ -634,9 +641,9 @@ class ChatScreenState extends State<ChatScreen> {
     //type == 0 its text msg
     //type == 1 its imageFile
     //type == 2 its sticker-emoji-gifs
-    if (contentMsg != null) {
-      textEditingController.clear();
-
+    if (contentMsg.isEmpty) {
+      Fluttertoast.showToast(msg: 'Empty message cannot send');
+    } else {
       var docRef = FirebaseFirestore.instance
           .collection('messages')
           .doc(chatId)
@@ -651,14 +658,15 @@ class ChatScreenState extends State<ChatScreen> {
             "idTo": widget.receiverId,
             "timestamp": DateTime.now().millisecondsSinceEpoch.toString(),
             "content": contentMsg,
-            "type": type
+            "type": type,
+            "photoUrl": FirebaseAuth.instance.currentUser.photoURL,
+            "nickname": FirebaseAuth.instance.currentUser.displayName
           },
         );
       });
       listScrollController.animateTo(0.0,
           duration: Duration(microseconds: 300), curve: Curves.easeOut);
-    } else {
-      Fluttertoast.showToast(msg: 'Empty message cannot send');
+      textEditingController.clear();
     }
   }
 
@@ -689,5 +697,79 @@ class ChatScreenState extends State<ChatScreen> {
       });
       Fluttertoast.showToast(msg: 'Error: ' + error);
     });
+  }
+
+  final FirebaseMessaging firebaseMessaging = FirebaseMessaging();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  final GoogleSignIn googleSignIn = GoogleSignIn();
+
+  void registerNotification() {
+    firebaseMessaging.requestNotificationPermissions();
+    firebaseMessaging.configure(
+      onMessage: (Map<String, dynamic> message) {
+        print("onMessage : $message");
+        Platform.isAndroid
+            ? showNotification(message['notification'])
+            : showNotification(message['aps']['alert']);
+        return;
+      },
+      onResume: (Map<String, dynamic> message) {
+        print("onResume: $message");
+        return;
+      },
+      onLaunch: (Map<String, dynamic> message) {
+        print("onLaunch: $message");
+        return;
+      },
+    );
+
+    firebaseMessaging.getToken().then((token) {
+      print('token: $token');
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(id)
+          .update({'pushToken': token});
+    }).catchError((err) {
+      Fluttertoast.showToast(msg: err.message.toString());
+    });
+  }
+
+  void configLocalNotification() {
+    var initializationSettingsAndroid =
+        new AndroidInitializationSettings('app_icon');
+    var initializationSettingsIOS = new IOSInitializationSettings();
+    var initializationSettings = new InitializationSettings(
+        initializationSettingsAndroid, initializationSettingsIOS);
+    flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  void showNotification(message) async {
+    var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
+      Platform.isAndroid
+          ? 'com.leahsharon.sms_chat_app'
+          : 'com.leahsharon.sms_chat_app',
+      'Flutter chat demo',
+      'your channel description',
+      playSound: true,
+      enableVibration: true,
+      importance: Importance.Max,
+      priority: Priority.High,
+    );
+    var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
+    var platformChannelSpecifics = new NotificationDetails(
+        androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+
+    print(message);
+//    print(message['body'].toString());
+//    print(json.encode(message));
+
+    await flutterLocalNotificationsPlugin.show(0, message['title'].toString(),
+        message['body'].toString(), platformChannelSpecifics,
+        payload: json.encode(message));
+
+//    await flutterLocalNotificationsPlugin.show(
+//        0, 'plain title', 'plain body', platformChannelSpecifics,
+//        payload: 'item x');
   }
 }

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:sms_chat_app/models/user.dart';
 import 'package:sms_chat_app/pages/AccountSettingsPage.dart';
 import 'package:sms_chat_app/pages/ChattingPage.dart';
+import 'package:sms_chat_app/pages/CurrentChatList.dart';
 import 'package:sms_chat_app/widgets/ProgressWidget.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -51,7 +52,10 @@ class HomeScreenState extends State<HomeScreen> {
                 Icons.person,
                 color: Colors.white,
               ),
-              onPressed: null),
+              onPressed: () {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => CurrentChats()));
+              }),
           suffixIcon: IconButton(
               icon: Icon(
                 Icons.close,
@@ -75,11 +79,24 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  appUsers() {
+    // Future<DocumentSnapshot> Function([GetOptions options]) appUsers =
+    //     FirebaseFirestore.instance.collection("users").doc().get;
+    // //
+    Navigator.push(
+        context, MaterialPageRoute(builder: (context) => AllChatScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: homePageHeader(),
       body: (searchedSnapshot == null) ? HasNoDataScreen() : HasDataScreen(),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.blue,
+        child: Icon(Icons.edit, color: Colors.white, size: 30.0),
+        onPressed: appUsers,
+      ),
     );
   }
 
@@ -196,6 +213,88 @@ class UserResult extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class AllChatScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.blue,
+        title: Text(' Select Contact',
+            style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 26.0)),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: users.snapshots(),
+        builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          if (snapshot.hasError) {
+            return Text('Something went wrong');
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Text("Loading");
+          }
+
+          return new ListView(
+            children: snapshot.data.docs.map((DocumentSnapshot document) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                              receiverPhoto: document.data()['photoURL'],
+                              receiverName: document.data()['nickname'],
+                              receiverId: document.data()['id'])));
+                },
+                child: new ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.black,
+                      backgroundImage: CachedNetworkImageProvider(
+                          document.data()['photoURL']),
+                    ),
+                    title: Text(
+                      document.data()['nickname'],
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      'Joined:' +
+                          DateFormat('dd MMMM yyyy - hh:mm:aa').format(
+                              DateTime.fromMillisecondsSinceEpoch(
+                                  int.parse(document.data()['createdAt']))),
+                      style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic),
+                    ),
+                    trailing: IconButton(
+                        icon:
+                            Icon(Icons.message, size: 25.0, color: Colors.blue),
+                        onPressed: () {
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => ChatScreen(
+                                      receiverPhoto:
+                                          document.data()['photoURL'],
+                                      receiverName: document.data()['nickname'],
+                                      receiverId: document.data()['id'])));
+                        })),
+              );
+            }).toList(),
+          );
+        },
       ),
     );
   }

@@ -56,13 +56,6 @@ class LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Container(
         color: Colors.blue,
-        // decoration: BoxDecoration(
-        //   gradient: LinearGradient(
-        //       begin: Alignment.topRight,
-        //       end: Alignment.bottomLeft,
-        //
-        //       colors: [Colors.lightBlueAccent, Colors.purpleAccent]),
-        // ),
         alignment: Alignment.center,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
